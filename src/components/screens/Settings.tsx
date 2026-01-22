@@ -39,7 +39,7 @@ export function Settings() {
   };
 
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const code = e.target.value.split(' - ')[0];
+    const code = e.target.value;
     let symbol = '$';
     switch (code) {
       case 'USD': symbol = '$'; break;

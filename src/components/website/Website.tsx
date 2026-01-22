@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { WebsiteLayout } from './WebsiteLayout';
 import { LandingPage } from './LandingPage';
 import { ShopPage } from './ShopPage';
+import { ProductDetails } from './ProductDetails';
 import { CustomerAuth } from './CustomerAuth';
 import { Checkout } from './Checkout';
 import { Profile } from './Profile';
@@ -12,14 +14,46 @@ import { TrackOrder } from './TrackOrder';
 type Page = 'home' | 'shop' | 'product' | 'login' | 'signup' | 'checkout' | 'profile' | 'orders' | 'favorites' | 'track';
 
 export function Website() {
-  const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
-  const handleNavigate = (page: Page, productId?: string) => {
-    setCurrentPage(page);
-    if (productId) {
-      setSelectedProductId(productId);
+  const getCurrentPage = (): Page => {
+    const path = location.pathname;
+    if (path === '/' || path === '') return 'home';
+    if (path === '/shop') return 'shop';
+    if (path === '/checkout') return 'checkout';
+    if (path === '/login') return 'login';
+    if (path === '/signup') return 'signup';
+    if (path === '/profile') return 'profile';
+    if (path === '/orders') return 'orders';
+    if (path === '/favorites') return 'favorites';
+    if (path === '/track') return 'track';
+    if (path.startsWith('/product/')) return 'product';
+    return 'home';
+  };
+
+  const currentPage = getCurrentPage();
+  const selectedProductId = location.pathname.startsWith('/product/') 
+    ? location.pathname.split('/product/')[1] 
+    : null;
+
+  const handleNavigate = (page: Page, productId?: string, categorySlug?: string) => {
+    if (page === 'home') navigate('/');
+    else if (page === 'shop') {
+      if (categorySlug) navigate(`/shop?category=${categorySlug}`);
+      else navigate('/shop');
     }
+    else if (page === 'product' && productId) navigate(`/product/${productId}`);
+    else if (page === 'checkout') navigate('/checkout');
+    else if (page === 'login') navigate('/login');
+    else if (page === 'signup') navigate('/signup');
+    else if (page === 'profile') navigate('/profile');
+    else if (page === 'orders') navigate('/orders');
+    else if (page === 'favorites') navigate('/favorites');
+    else if (page === 'track') navigate('/track');
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -71,7 +105,7 @@ export function Website() {
     return (
       <Checkout
         onBack={() => handleNavigate('shop')}
-        onSuccess={() => handleNavigate('home')}
+        onSuccess={() => handleNavigate('shop')}
       />
     );
   }
@@ -113,16 +147,24 @@ export function Website() {
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <LandingPage onNavigate={handleNavigate} />;
+        return <LandingPage onNavigate={handleNavigate} onOpenCart={() => setIsCartOpen(true)} />;
       case 'shop':
-        return <ShopPage onNavigate={handleNavigate} />;
+        return <ShopPage onNavigate={handleNavigate} onOpenCart={() => setIsCartOpen(true)} />;
+      case 'product':
+        return <ProductDetails onOpenCart={() => setIsCartOpen(true)} productId={selectedProductId} />;
       default:
-        return <LandingPage onNavigate={handleNavigate} />;
+        return <LandingPage onNavigate={handleNavigate} onOpenCart={() => setIsCartOpen(true)} />;
     }
   };
 
   return (
-    <WebsiteLayout currentPage={currentPage as 'home' | 'shop' | 'product'} onNavigate={handleNavigate}>
+    <WebsiteLayout 
+      currentPage={currentPage as 'home' | 'shop' | 'product'} 
+      onNavigate={handleNavigate}
+      isCartOpen={isCartOpen}
+      onOpenCart={() => setIsCartOpen(true)}
+      onCloseCart={() => setIsCartOpen(false)}
+    >
       {renderPage()}
     </WebsiteLayout>
   );

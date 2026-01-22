@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Search, Filter, ShoppingCart, Star, Heart } from 'lucide-react';
 import { publicAnonKey } from '../../utils/supabase/info';
 import { BASE_URL } from '../../utils/api';
+import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 interface ShopPageProps {
   onNavigate: (page: 'product', productId: string) => void;
+  onOpenCart: () => void;
 }
 
 interface Category {
@@ -27,10 +30,14 @@ interface Product {
   rating?: number;
 }
 
-export function ShopPage({ onNavigate }: ShopPageProps) {
+export function ShopPage({ onNavigate, onOpenCart }: ShopPageProps) {
+  const { formatPrice } = useStoreSettings();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  const selectedCategory = searchParams.get('category');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -98,7 +105,7 @@ export function ShopPage({ onNavigate }: ShopPageProps) {
       quantity: 1,
     });
     localStorage.setItem('cart', JSON.stringify(cart));
-    alert('Product added to cart!');
+    onOpenCart();
   };
 
   const toggleFavorite = (product: Product) => {
@@ -172,7 +179,7 @@ export function ShopPage({ onNavigate }: ShopPageProps) {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setSelectedCategory(null)}
+            onClick={() => setSearchParams({})}
             className={`px-6 py-3 rounded-xl font-medium transition-all ${
               !selectedCategory
                 ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/30'
@@ -186,7 +193,7 @@ export function ShopPage({ onNavigate }: ShopPageProps) {
               key={category.id}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setSelectedCategory(category.slug)}
+              onClick={() => setSearchParams({ category: category.slug })}
               className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
                 selectedCategory === category.slug
                   ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/30'
@@ -218,7 +225,8 @@ export function ShopPage({ onNavigate }: ShopPageProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 whileHover={{ y: -10 }}
-                className="bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all border border-gray-100"
+                onClick={() => onNavigate('product', product.id)}
+                className="bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all border border-gray-100 cursor-pointer group"
               >
                 <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
                   {product.image ? (
@@ -260,13 +268,16 @@ export function ShopPage({ onNavigate }: ShopPageProps) {
                   )}
                   <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold text-red-600">
-                      ${product.price.toFixed(2)}
+                      {formatPrice(product.price)}
                     </span>
                     <div className="flex gap-2">
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => toggleFavorite(product)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(product);
+                        }}
                         className="p-3 rounded-xl border-2 border-gray-300 hover:border-red-500 transition-colors"
                       >
                         <Heart className={`w-5 h-5 ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
@@ -274,7 +285,10 @@ export function ShopPage({ onNavigate }: ShopPageProps) {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => addToCart(product)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(product);
+                        }}
                         disabled={product.stock <= 0}
                         className={`p-3 rounded-xl flex items-center gap-2 font-medium ${
                           product.stock > 0

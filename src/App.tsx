@@ -8,9 +8,8 @@ export default function App() {
     <StoreSettingsProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Website />} />
           <Route path="/admin/*" element={<AdminApp />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/*" element={<Website />} />
         </Routes>
       </BrowserRouter>
     </StoreSettingsProvider>

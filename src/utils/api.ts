@@ -1,12 +1,13 @@
 import { projectId, publicAnonKey, functionName } from './supabase/info';
 
-// If running a local server (removed Supabase), use localhost
-// Otherwise use the Supabase Edge Function URL
+// If VITE_API_URL is provided (e.g. for production), use it.
+// Otherwise, check VITE_USE_LOCAL_SERVER to decide between localhost and Supabase.
 const USE_LOCAL_SERVER = import.meta.env.VITE_USE_LOCAL_SERVER === 'true';
+const CUSTOM_API_URL = import.meta.env.VITE_API_URL;
 
-export const BASE_URL = USE_LOCAL_SERVER 
+export const BASE_URL = CUSTOM_API_URL || (USE_LOCAL_SERVER 
   ? `http://localhost:3001/functions/v1/${functionName}`
-  : `https://${projectId}.supabase.co/functions/v1/${functionName}`;
+  : `https://${projectId}.supabase.co/functions/v1/${functionName}`);
 
 let accessToken: string | null = null;
 
@@ -116,17 +117,22 @@ export const productsAPI = {
 
 // Orders API
 export const ordersAPI = {
-  getAll: (params?: { status?: string; search?: string }) => {
+  getAll: (params?: { status?: string; search?: string; email?: string }) => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.search) queryParams.append('search', params.search);
+    if (params?.email) queryParams.append('email', params.email);
     return fetchAPI(`/orders?${queryParams.toString()}`);
   },
+  update: (id: string | number, order: any) => fetchAPI(`/orders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(order),
+  }),
 };
 
 // Customers API
 export const customersAPI = {
-  getAll: () => fetchAPI('/customers'),
+  getAll: () => fetchAPI('/admin/customers'),
   update: (id: string | number, customer: any) => fetchAPI(`/customers/${id}`, {
     method: 'PUT',
     body: JSON.stringify(customer),

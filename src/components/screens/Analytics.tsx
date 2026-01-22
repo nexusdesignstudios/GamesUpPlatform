@@ -3,6 +3,7 @@ import { TrendingUp, Download, Calendar } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 const revenueData = [
   { month: 'Jan', revenue: 45200, orders: 234, profit: 18500 },
@@ -27,14 +28,15 @@ const categoryData = [
 ];
 
 const topRegions = [
-  { region: 'North America', revenue: '$342,500', growth: 15.2, flag: '🇺🇸' },
-  { region: 'Europe', revenue: '$289,300', growth: 12.8, flag: '🇪🇺' },
-  { region: 'Asia Pacific', revenue: '$215,600', growth: 24.5, flag: '🇯🇵' },
-  { region: 'Latin America', revenue: '$98,400', growth: 18.3, flag: '🇧🇷' },
-  { region: 'Middle East', revenue: '$54,200', growth: 9.7, flag: '🇦🇪' },
+  { region: 'North America', revenue: 342500, growth: 15.2, flag: '🇺🇸' },
+  { region: 'Europe', revenue: 289300, growth: 12.8, flag: '🇪🇺' },
+  { region: 'Asia Pacific', revenue: 215600, growth: 24.5, flag: '🇯🇵' },
+  { region: 'Latin America', revenue: 98400, growth: 18.3, flag: '🇧🇷' },
+  { region: 'Middle East', revenue: 54200, growth: 9.7, flag: '🇦🇪' },
 ];
 
 export function Analytics() {
+  const { formatPrice } = useStoreSettings();
   const [dateRange, setDateRange] = useState('12months');
 
   return (
@@ -66,7 +68,7 @@ export function Analytics() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Total Revenue</p>
-              <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">$847,239</h3>
+              <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{formatPrice(847239)}</h3>
               <div className="flex items-center gap-1 mt-2">
                 <TrendingUp className="w-4 h-4 text-green-500" />
                 <span className="text-sm font-medium text-green-500">+18.2%</span>
@@ -83,7 +85,7 @@ export function Analytics() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Net Profit</p>
-              <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">$312,845</h3>
+              <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{formatPrice(312845)}</h3>
               <div className="flex items-center gap-1 mt-2">
                 <TrendingUp className="w-4 h-4 text-green-500" />
                 <span className="text-sm font-medium text-green-500">+22.4%</span>
@@ -100,7 +102,7 @@ export function Analytics() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Avg. Order Value</p>
-              <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">$68.02</h3>
+              <h3 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{formatPrice(68.02)}</h3>
               <div className="flex items-center gap-1 mt-2">
                 <TrendingUp className="w-4 h-4 text-green-500" />
                 <span className="text-sm font-medium text-green-500">+5.8%</span>
@@ -193,7 +195,7 @@ export function Analytics() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <h4 className="font-medium text-gray-900 dark:text-white">{region.region}</h4>
-                    <span className="font-semibold text-gray-900 dark:text-white">{region.revenue}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white">{formatPrice(region.revenue)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">

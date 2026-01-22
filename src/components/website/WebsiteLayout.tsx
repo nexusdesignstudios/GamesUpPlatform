@@ -3,20 +3,24 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, User, Search, Menu, X, Home, Store, LogIn, UserPlus, LogOut, Package, Heart, Settings } from 'lucide-react';
 import { Cart } from './Cart';
 import { SearchModal } from './SearchModal';
+import { WebsiteLogo } from './WebsiteLogo';
+import logo from '../../assets/gamesupnew.png';
 
 interface WebsiteLayoutProps {
   children: ReactNode;
   currentPage: 'home' | 'shop' | 'product';
   onNavigate: (page: 'home' | 'shop' | 'product' | 'checkout' | 'profile' | 'orders' | 'favorites', productId?: string) => void;
+  isCartOpen: boolean;
+  onOpenCart: () => void;
+  onCloseCart: () => void;
 }
 
-export function WebsiteLayout({ children, currentPage, onNavigate }: WebsiteLayoutProps) {
+export function WebsiteLayout({ children, currentPage, onNavigate, isCartOpen, onOpenCart, onCloseCart }: WebsiteLayoutProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [cartCount, setCartCount] = useState(0);
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -54,7 +58,7 @@ export function WebsiteLayout({ children, currentPage, onNavigate }: WebsiteLayo
   };
 
   const handleOpenCart = () => {
-    setIsCartOpen(true);
+    onOpenCart();
     updateCartCount();
   };
 
@@ -82,12 +86,7 @@ export function WebsiteLayout({ children, currentPage, onNavigate }: WebsiteLayo
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => onNavigate('home')}
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/30">
-                <span className="text-white font-bold text-lg">GU</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-red-600 to-red-500 bg-clip-text text-transparent">
-                Games - Up
-              </span>
+              <img src={logo} alt="Games Up" className="h-6 w-auto object-contain" />
             </motion.div>
 
             {/* Desktop Navigation */}
@@ -333,10 +332,7 @@ export function WebsiteLayout({ children, currentPage, onNavigate }: WebsiteLayo
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">GU</span>
-                </div>
-                <span className="text-xl font-bold">Games - Up</span>
+                <WebsiteLogo variant="white" className="h-10 w-auto object-contain" />
               </div>
               <p className="text-gray-400 text-sm">
                 Your ultimate destination for gaming products and digital goods.
@@ -377,10 +373,11 @@ export function WebsiteLayout({ children, currentPage, onNavigate }: WebsiteLayo
       <Cart 
         isOpen={isCartOpen}
         onClose={() => {
-          setIsCartOpen(false);
+          onCloseCart();
           updateCartCount();
         }}
         onCheckout={handleCheckout}
+        onNavigate={onNavigate}
       />
 
       <SearchModal 

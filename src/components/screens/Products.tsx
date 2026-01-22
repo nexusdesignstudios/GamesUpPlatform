@@ -10,11 +10,14 @@ interface Product {
   id: string | number;
   name: string;
   category: string;
-  price: string;
-  cost?: string;
+  categorySlug?: string;
+  subCategory?: string;
+  price: number;
+  cost?: number;
   stock: number;
   status: string;
   image: string;
+  attributes?: Record<string, any>;
   purchasedEmail?: string;
   purchasedPassword?: string;
   productCode?: string;
@@ -25,7 +28,7 @@ interface Product {
   }[];
 }
 
-const QuickEditCell = ({ value, onSave, type = "text", prefix = "" }: { value: string | number, onSave: (val: string | number) => void, type?: string, prefix?: string }) => {
+const QuickEditCell = ({ value, onSave, type = "text", prefix = "", options }: { value: string | number, onSave: (val: string | number) => void, type?: string, prefix?: string, options?: string[] }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentValue, setCurrentValue] = useState(value);
 
@@ -47,6 +50,23 @@ const QuickEditCell = ({ value, onSave, type = "text", prefix = "" }: { value: s
   };
 
   if (isEditing) {
+    if (options) {
+      return (
+        <select
+          autoFocus
+          value={currentValue}
+          onChange={(e) => setCurrentValue(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          className="w-full min-w-[80px] px-2 py-1 bg-white dark:bg-gray-800 border border-blue-500 rounded text-gray-900 dark:text-white"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {options.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      );
+    }
     return (
         <input
           autoFocus
@@ -128,6 +148,9 @@ const initialProducts: Product[] = [
 export function Products() {
   const { settings, formatPrice } = useStoreSettings();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subCategories, setSubCategories] = useState<any[]>([]);
+  const [attributes, setAttributes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -137,11 +160,13 @@ export function Products() {
   
   const [formData, setFormData] = useState({
     name: '',
-    category: 'Consoles',
+    category: '',
+    subCategory: '',
     price: '',
     cost: '',
     stock: 0,
     image: '',
+    attributes: {} as Record<string, any>,
     digitalItems: [] as { email?: string; password?: string; code?: string }[],
   });
 
@@ -149,36 +174,71 @@ export function Products() {
   const [newItem, setNewItem] = useState({ email: '', password: '', code: '' });
 
   useEffect(() => {
-    loadProducts();
+    loadData();
   }, []);
 
-  async function loadProducts() {
+  const loadData = async () => {
     try {
-      setLoading(true);
-      const data = await productsAPI.getAll();
-      setProducts(data.products);
-      setError(null);
+        setLoading(true);
+        const [catsRes, subCatsRes, attrsRes, productsRes] = await Promise.all([
+            fetch(`${BASE_URL}/system/categories`),
+            fetch(`${BASE_URL}/system/subcategories`),
+            fetch(`${BASE_URL}/system/attributes`),
+            productsAPI.getAll()
+        ]);
+
+        if (catsRes.ok) {
+            const data = await catsRes.json();
+            setCategories(data);
+            if (data.length > 0 && !formData.category) {
+                 setFormData(prev => ({ ...prev, category: data[0].name }));
+            }
+        }
+        if (subCatsRes.ok) setSubCategories(await subCatsRes.json());
+        if (attrsRes.ok) setAttributes(await attrsRes.json());
+        
+        setProducts(productsRes.products);
+        setError(null);
     } catch (err: any) {
-      console.error('Error loading products:', err);
-      setError(err.message || 'Failed to load products');
-      // If unauthorized, might need to re-login
-      if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
-        setError('Session expired. Please refresh the page and log in again.');
-      }
+        console.error("Failed to load data", err);
+        setError(err.message || 'Failed to load data');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
-  const handleQuickUpdate = async (id: string | number, field: string, value: any) => {
+  async function loadProducts() {
+     // Re-fetch only products if needed, but usually we just reload everything or optimistically update
+     try {
+       const data = await productsAPI.getAll();
+       setProducts(data.products);
+     } catch (err) {
+       console.error(err);
+     }
+  }
+
+  const handleQuickUpdate = async (id: string | number, field: string, value: any, isAttribute = false) => {
     try {
         const product = products.find(p => p.id === id);
         if (!product) return;
 
-        // Optimistic update
-        setProducts(products.map(p => p.id === id ? { ...p, [field]: value } : p));
+        let updatedProduct;
+        if (isAttribute) {
+            updatedProduct = {
+                ...product,
+                attributes: {
+                    ...(product.attributes || {}),
+                    [field]: value
+                }
+            };
+        } else {
+            updatedProduct = { ...product, [field]: value };
+        }
 
-        await productsAPI.update(id, { ...product, [field]: value });
+        // Optimistic update
+        setProducts(products.map(p => p.id === id ? updatedProduct : p));
+
+        await productsAPI.update(id, updatedProduct);
     } catch (error) {
         console.error('Error updating product:', error);
         // Revert or show error (simplest is to reload)
@@ -290,7 +350,7 @@ export function Products() {
       await loadProducts();
       setIsAddModalOpen(false);
       setEditingProduct(null);
-      setFormData({ name: '', category: 'Consoles', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
+      setFormData({ name: '', category: categories[0]?.name || '', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
       setNewItem({ email: '', password: '', code: '' });
     } catch (error) {
       console.error('Error saving product:', error);
@@ -315,8 +375,8 @@ export function Products() {
     setFormData({
       name: product.name,
       category: product.category,
-      price: product.price.replace('$', ''),
-      cost: product.cost ? product.cost.replace('$', '') : '',
+      price: product.price.toString().replace('$', ''),
+      cost: product.cost ? product.cost.toString().replace('$', '') : '',
       stock: product.stock,
       image: product.image,
       purchasedEmail: product.purchasedEmail || '',
@@ -361,7 +421,7 @@ export function Products() {
         <Button
           onClick={() => {
             setEditingProduct(null);
-            setFormData({ name: '', category: 'Consoles', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
+            setFormData({ name: '', category: categories[0]?.name || '', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
             setNewItem({ email: '', password: '', code: '' });
             setIsAddModalOpen(true);
           }}
@@ -390,10 +450,9 @@ export function Products() {
             className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option>All</option>
-            <option>Consoles</option>
-            <option>Accessories</option>
-            <option>Games</option>
-            <option>Services</option>
+            {categories.map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
           </select>
         </div>
       </Card>
@@ -406,6 +465,10 @@ export function Products() {
               <tr className="border-b border-gray-200 dark:border-gray-700">
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Product</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Category</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Sub Category</th>
+                {attributes.filter(a => a.isActive).map(attr => (
+                  <th key={attr.id} className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">{attr.name}</th>
+                ))}
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Price</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Cost</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">Stock</th>
@@ -427,19 +490,47 @@ export function Products() {
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">{product.category}</td>
+                  <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
+                    <QuickEditCell 
+                        value={product.category} 
+                        onSave={(val) => handleQuickUpdate(product.id, 'category', val)}
+                        options={categories.map(c => c.name)}
+                    />
+                  </td>
+                  <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
+                    <QuickEditCell 
+                        value={product.subCategory || ''} 
+                        onSave={(val) => handleQuickUpdate(product.id, 'subCategory', val)}
+                        options={(() => {
+                            const cat = categories.find(c => c.slug === product.categorySlug || c.name === product.category);
+                            return cat ? subCategories.filter(s => s.categoryId === cat.id && s.isActive).map(s => s.name) : [];
+                        })()}
+                    />
+                  </td>
+                  {attributes.filter(a => a.isActive).map(attr => (
+                    <td key={attr.id} className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
+                        <QuickEditCell
+                            value={product.attributes?.[attr.name] || ''}
+                            onSave={(val) => handleQuickUpdate(product.id, attr.name, val, true)}
+                            options={attr.options && attr.options.length > 0 ? attr.options : undefined}
+                            type={attr.type === 'number' ? 'number' : 'text'}
+                        />
+                    </td>
+                  ))}
                   <td className="py-4 px-4 text-sm font-medium text-gray-900 dark:text-white">
                     <QuickEditCell 
                         value={product.price} 
-                        onSave={(val) => handleQuickUpdate(product.id, 'price', val)} 
+                        onSave={(val) => handleQuickUpdate(product.id, 'price', parseFloat(val as string))} 
                         prefix={settings.currency_symbol}
+                        type="number"
                     />
                   </td>
                   <td className="py-4 px-4 text-sm font-medium text-gray-500 dark:text-gray-400">
                     <QuickEditCell 
-                        value={product.cost || '0.00'} 
-                        onSave={(val) => handleQuickUpdate(product.id, 'cost', val)} 
+                        value={product.cost || 0} 
+                        onSave={(val) => handleQuickUpdate(product.id, 'cost', parseFloat(val as string))} 
                         prefix={settings.currency_symbol}
+                        type="number"
                     />
                   </td>
                   <td className="py-4 px-4 text-sm text-gray-600 dark:text-gray-300">
@@ -489,7 +580,7 @@ export function Products() {
         onClose={() => {
           setIsAddModalOpen(false);
           setEditingProduct(null);
-          setFormData({ name: '', category: 'Consoles', price: '', cost: '', stock: 0, image: '', purchasedEmail: '', purchasedPassword: '', productCode: '' });
+          setFormData({ name: '', category: categories[0]?.name || '', price: '', cost: '', stock: 0, image: '', digitalItems: [] });
         }}
         title={editingProduct ? 'Edit Product' : 'Add New Product'}
       >
@@ -505,7 +596,7 @@ export function Products() {
             />
           </div>
           
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
               <select
@@ -513,30 +604,78 @@ export function Products() {
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
               >
-                <option>Consoles</option>
-                <option>Accessories</option>
-                <option>Games</option>
-                <option>Services</option>
+                {categories.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Price ($)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sub Category</label>
+              <select
+                value={formData.subCategory}
+                onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="">Select Sub Category</option>
+                {(() => {
+                    const cat = categories.find(c => c.name === formData.category);
+                    return cat ? subCategories.filter(s => s.categoryId === cat.id && s.isActive).map(s => (
+                        <option key={s.id} value={s.name}>{s.name}</option>
+                    )) : [];
+                })()}
+              </select>
+            </div>
+          </div>
+
+          {attributes.filter(a => a.isActive).length > 0 && (
+            <div className="grid grid-cols-2 gap-4">
+                {attributes.filter(a => a.isActive).map(attr => (
+                    <div key={attr.id}>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{attr.name}</label>
+                        {attr.options && attr.options.length > 0 ? (
+                            <select
+                                value={formData.attributes?.[attr.name] || ''}
+                                onChange={(e) => setFormData({ ...formData, attributes: { ...formData.attributes, [attr.name]: e.target.value } })}
+                                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                            >
+                                <option value="">Select {attr.name}</option>
+                                {attr.options.map((opt: string) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input
+                                type={attr.type === 'number' ? 'number' : 'text'}
+                                value={formData.attributes?.[attr.name] || ''}
+                                onChange={(e) => setFormData({ ...formData, attributes: { ...formData.attributes, [attr.name]: e.target.value } })}
+                                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                                placeholder={`Enter ${attr.name}`}
+                            />
+                        )}
+                    </div>
+                ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Price ({settings.currency_symbol})</label>
               <input
                 type="number"
                 step="0.01"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cost ($)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Cost ({settings.currency_symbol})</label>
               <input
                 type="number"
                 step="0.01"
                 value={formData.cost}
-                onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
                 className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="0.00"
               />

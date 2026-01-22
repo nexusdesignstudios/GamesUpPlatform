@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Mail, Lock, User, Phone, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { publicAnonKey } from '../../utils/supabase/info';
 import { BASE_URL } from '../../utils/api';
+import logo from '../../assets/gamesupnew.png';
 
 interface CustomerAuthProps {
   mode: 'login' | 'signup';
@@ -79,9 +80,7 @@ export function CustomerAuth({ mode, onSuccess, onSwitchMode }: CustomerAuthProp
         <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-gray-100">
           {/* Logo */}
           <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-xl">GU</span>
-            </div>
+            <img src={logo} alt="Games Up" className="h-12 w-auto object-contain" />
           </div>
 
           {/* Title */}

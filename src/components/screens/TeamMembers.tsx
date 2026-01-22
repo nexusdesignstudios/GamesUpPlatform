@@ -1,177 +1,393 @@
-import { Card } from '../ui/Card';
-import { Mail, Phone, Calendar, TrendingUp } from 'lucide-react';
 
-const teamMembers = [
-  {
-    id: 1,
-    name: 'Alex Johnson',
-    role: 'Product Manager',
-    email: 'alex.j@psstore.com',
-    phone: '+1 (555) 123-4567',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop',
-    activeTasks: 8,
-    completedTasks: 156,
-    joinDate: 'Jan 2023',
-    performance: 94,
-  },
-  {
-    id: 2,
-    name: 'Sarah Williams',
-    role: 'Customer Support Lead',
-    email: 'sarah.w@psstore.com',
-    phone: '+1 (555) 234-5678',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop',
-    activeTasks: 12,
-    completedTasks: 234,
-    joinDate: 'Mar 2023',
-    performance: 98,
-  },
-  {
-    id: 3,
-    name: 'Mike Chen',
-    role: 'Marketing Director',
-    email: 'mike.c@psstore.com',
-    phone: '+1 (555) 345-6789',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
-    activeTasks: 6,
-    completedTasks: 189,
-    joinDate: 'Feb 2023',
-    performance: 91,
-  },
-  {
-    id: 4,
-    name: 'Emma Davis',
-    role: 'Operations Manager',
-    email: 'emma.d@psstore.com',
-    phone: '+1 (555) 456-7890',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop',
-    activeTasks: 10,
-    completedTasks: 203,
-    joinDate: 'Apr 2023',
-    performance: 96,
-  },
-  {
-    id: 5,
-    name: 'James Wilson',
-    role: 'Data Analyst',
-    email: 'james.w@psstore.com',
-    phone: '+1 (555) 567-8901',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop',
-    activeTasks: 5,
-    completedTasks: 142,
-    joinDate: 'Jun 2023',
-    performance: 88,
-  },
-  {
-    id: 6,
-    name: 'Lisa Anderson',
-    role: 'UX Designer',
-    email: 'lisa.a@psstore.com',
-    phone: '+1 (555) 678-9012',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop',
-    activeTasks: 7,
-    completedTasks: 178,
-    joinDate: 'May 2023',
-    performance: 93,
-  },
-];
+import { useState, useEffect } from 'react';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
+import { Mail, Phone, Calendar, TrendingUp, Plus, Edit2, Trash2, Key, Upload, Shield, User, FileText } from 'lucide-react';
+import { BASE_URL } from '../../utils/api';
+import { publicAnonKey } from '../../utils/supabase/info';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string; // 'admin', 'manager', 'staff'
+  job_title?: string;
+  phone?: string;
+  avatar?: string;
+  identity_document?: string;
+  created_at?: string;
+}
 
 export function TeamMembers() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  
+  // Form State
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'staff',
+    job_title: '',
+    phone: '',
+    avatar: '',
+    identity_document: ''
+  });
+  
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [idFile, setIdFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/admin/users`, {
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${BASE_URL}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) throw new Error('Upload failed');
+    const data = await response.json();
+    return data.url;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      let avatarUrl = formData.avatar;
+      let idUrl = formData.identity_document;
+
+      if (avatarFile) {
+        avatarUrl = await handleFileUpload(avatarFile);
+      }
+      if (idFile) {
+        idUrl = await handleFileUpload(idFile);
+      }
+
+      const payload = {
+        ...formData,
+        avatar: avatarUrl,
+        identity_document: idUrl,
+      };
+
+      const url = editingUser 
+        ? `${BASE_URL}/admin/users/${editingUser.id}`
+        : `${BASE_URL}/admin/users`;
+        
+      const method = editingUser ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        setShowModal(false);
+        fetchUsers();
+        resetForm();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Operation failed');
+      }
+    } catch (error) {
+      console.error('Error saving user:', error);
+      alert('Failed to save user');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    
+    try {
+      const response = await fetch(`${BASE_URL}/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+      });
+
+      if (response.ok) {
+        fetchUsers();
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    }
+  };
+
+  const openAddModal = () => {
+    setEditingUser(null);
+    resetForm();
+    setShowModal(true);
+  };
+
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      email: user.email,
+      password: '', // Empty for edit unless resetting
+      role: user.role,
+      job_title: user.job_title || '',
+      phone: user.phone || '',
+      avatar: user.avatar || '',
+      identity_document: user.identity_document || ''
+    });
+    setAvatarFile(null);
+    setIdFile(null);
+    setShowModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      role: 'staff',
+      job_title: '',
+      phone: '',
+      avatar: '',
+      identity_document: ''
+    });
+    setAvatarFile(null);
+    setIdFile(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Team Members</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Manage your team and track performance</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Employees</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your team members and roles</p>
+        </div>
+        <Button onClick={openAddModal} className="bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Employee
+        </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="text-center p-8">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total Members</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{teamMembers.length}</p>
-        </Card>
-        <Card className="text-center p-8">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Active Tasks</p>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-            {teamMembers.reduce((acc, m) => acc + m.activeTasks, 0)}
-          </p>
-        </Card>
-        <Card className="text-center p-8">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Completed Tasks</p>
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-            {teamMembers.reduce((acc, m) => acc + m.completedTasks, 0)}
-          </p>
-        </Card>
-        <Card className="text-center p-8">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Avg. Performance</p>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
-            {Math.round(teamMembers.reduce((acc, m) => acc + m.performance, 0) / teamMembers.length)}%
-          </p>
-        </Card>
-      </div>
-
-      {/* Team Members Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {teamMembers.map((member) => (
-          <Card key={member.id} className="hover:shadow-lg transition-shadow p-8">
-            <div className="flex items-start gap-4 mb-4">
-              <img src={member.avatar} alt={member.name} className="w-16 h-16 rounded-full object-cover" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white">{member.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{member.role}</p>
-                <div className="flex items-center gap-1 mt-2">
-                  <TrendingUp className="w-3 h-3 text-green-500" />
-                  <span className="text-xs font-medium text-green-500">{member.performance}% Performance</span>
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {users.map((user) => (
+          <Card key={user.id} className="p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                  {user.avatar ? (
+                    <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-full h-full p-2 text-gray-400" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">{user.name}</h3>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">{user.job_title || user.role}</p>
                 </div>
               </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => openEditModal(user)}
+                  className="p-1 text-gray-400 hover:text-blue-500 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(user.id)}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3 mb-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+              <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                <span>{member.email}</span>
+                {user.email}
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <Phone className="w-4 h-4" />
-                <span>{member.phone}</span>
+              {user.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  {user.phone}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                <span className="capitalize">{user.role} Access</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <Calendar className="w-4 h-4" />
-                <span>Joined {member.joinDate}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Active Tasks</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">{member.activeTasks}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1">{member.completedTasks}</p>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Task Completion</span>
-                <span className="text-xs font-medium text-gray-900 dark:text-white">
-                  {Math.round((member.completedTasks / (member.completedTasks + member.activeTasks)) * 100)}%
-                </span>
-              </div>
-              <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full"
-                  style={{
-                    width: `${Math.round((member.completedTasks / (member.completedTasks + member.activeTasks)) * 100)}%`,
-                  }}
-                ></div>
-              </div>
+              {user.identity_document && (
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <FileText className="w-4 h-4" />
+                  <a href={user.identity_document} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    View ID Document
+                  </a>
+                </div>
+              )}
             </div>
           </Card>
         ))}
       </div>
+
+      {/* Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingUser ? 'Edit Employee' : 'Add New Employee'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+            <input
+              type="email"
+              required
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {editingUser ? 'New Password (leave blank to keep current)' : 'Password'}
+            </label>
+            <input
+              type="password"
+              required={!editingUser}
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              placeholder={editingUser ? 'Enter to reset password' : ''}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role (Access)</label>
+              <select
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Job Title</label>
+              <input
+                type="text"
+                value={formData.job_title}
+                onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="e.g. Sales Manager"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Avatar</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                  id="avatar-upload"
+                />
+                <label
+                  htmlFor="avatar-upload"
+                  className="cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose File
+                </label>
+                {(avatarFile || formData.avatar) && <span className="text-xs text-green-500">Selected</span>}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">National ID / Passport</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setIdFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                  id="id-upload"
+                />
+                <label
+                  htmlFor="id-upload"
+                  className="cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload ID
+                </label>
+                {(idFile || formData.identity_document) && <span className="text-xs text-green-500">Selected</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="submit" className="flex-1">
+              Save Employee
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setShowModal(false)} className="flex-1">
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

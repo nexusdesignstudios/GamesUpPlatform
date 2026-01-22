@@ -10,7 +10,7 @@ interface SoldProduct {
   customerName: string;
   customerEmail: string;
   productName: string;
-  price: string;
+  price: number;
   date: string;
   digitalItem: {
     email?: string;

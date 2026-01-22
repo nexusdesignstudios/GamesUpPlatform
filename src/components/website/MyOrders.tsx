@@ -8,7 +8,7 @@ interface Order {
   id: string;
   orderNumber: string;
   date: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'completed' | 'paid';
   items: any[];
   total: number;
   deliveryMethod: string;
@@ -217,6 +217,79 @@ export function MyOrders({ onBack, onOrderAgain, onTrackOrder }: MyOrdersProps) 
                               <p className="text-sm font-bold text-red-600 mt-1">
                                 ${(item.price * item.quantity).toFixed(2)}
                               </p>
+
+                              {/* Digital Product Credentials */}
+                              {/* Show credentials for paid/completed/delivered orders */}
+                              {(['delivered', 'completed', 'paid'].includes(order.status)) && (item.digital_email || item.digital_code || item.digital_password) && (
+                                <div className="mt-3 p-4 bg-green-50 rounded-xl border border-green-200">
+                                  <h4 className="font-bold text-sm text-green-800 mb-3 flex items-center gap-2">
+                                    <CheckCircle className="w-4 h-4" />
+                                    Digital Account Credentials
+                                  </h4>
+                                  
+                                  <div className="space-y-3">
+                                    {item.digital_email && (
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-xs font-semibold text-green-700 uppercase tracking-wider">Email</span>
+                                        <div className="flex items-center gap-2">
+                                          <code className="flex-1 bg-white px-3 py-2 rounded-lg border border-green-200 text-green-900 text-sm font-mono select-all shadow-sm">
+                                            {item.digital_email}
+                                          </code>
+                                          <button 
+                                            onClick={() => navigator.clipboard.writeText(item.digital_email)}
+                                            className="p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-colors"
+                                            title="Copy Email"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {item.digital_password && (
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-xs font-semibold text-green-700 uppercase tracking-wider">Password</span>
+                                        <div className="flex items-center gap-2">
+                                          <code className="flex-1 bg-white px-3 py-2 rounded-lg border border-green-200 text-green-900 text-sm font-mono select-all shadow-sm">
+                                            {item.digital_password}
+                                          </code>
+                                          <button 
+                                            onClick={() => navigator.clipboard.writeText(item.digital_password)}
+                                            className="p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-colors"
+                                            title="Copy Password"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {item.digital_code && (
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-xs font-semibold text-green-700 uppercase tracking-wider">License Code</span>
+                                        <div className="flex items-center gap-2">
+                                          <code className="flex-1 bg-white px-3 py-2 rounded-lg border border-green-200 text-green-900 text-sm font-mono select-all shadow-sm tracking-wide">
+                                            {item.digital_code}
+                                          </code>
+                                          <button 
+                                            onClick={() => navigator.clipboard.writeText(item.digital_code)}
+                                            className="p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded-lg transition-colors"
+                                            title="Copy Code"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -234,6 +307,8 @@ export function MyOrders({ onBack, onOrderAgain, onTrackOrder }: MyOrdersProps) 
                           </p>
                         </div>
                       )}
+
+
 
                       {/* Track Order Button */}
                       <div className="mt-6">

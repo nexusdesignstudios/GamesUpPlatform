@@ -20,18 +20,18 @@ const salesData = [
 ];
 
 const topProducts = [
-  { id: 1, name: 'PlayStation 5 Console', sales: 1245, revenue: '$623,755', image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=200&h=200&fit=crop' },
-  { id: 2, name: 'DualSense Controller', sales: 2840, revenue: '$199,800', image: 'https://images.unsplash.com/photo-1592840496694-26d035b52b48?w=200&h=200&fit=crop' },
-  { id: 3, name: 'PS5 VR Headset', sales: 856, revenue: '$427,144', image: 'https://images.unsplash.com/photo-1617802690658-1173a812650d?w=200&h=200&fit=crop' },
-  { id: 4, name: 'Spider-Man 2', sales: 1520, revenue: '$106,400', image: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&h=200&fit=crop' },
+  { id: 1, name: 'PlayStation 5 Console', sales: 1245, revenue: 623755, image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?w=200&h=200&fit=crop' },
+  { id: 2, name: 'DualSense Controller', sales: 2840, revenue: 199800, image: 'https://images.unsplash.com/photo-1592840496694-26d035b52b48?w=200&h=200&fit=crop' },
+  { id: 3, name: 'PS5 VR Headset', sales: 856, revenue: 427144, image: 'https://images.unsplash.com/photo-1617802690658-1173a812650d?w=200&h=200&fit=crop' },
+  { id: 4, name: 'Spider-Man 2', sales: 1520, revenue: 106400, image: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=200&h=200&fit=crop' },
 ];
 
 const recentOrders = [
-  { id: '#PS-10234', customer: 'Alex Johnson', product: 'PS5 Console + 2 Games', status: 'completed', amount: '$599.99', date: 'Jan 4, 2026' },
-  { id: '#PS-10235', customer: 'Sarah Williams', product: 'DualSense Midnight Black', status: 'pending', amount: '$74.99', date: 'Jan 4, 2026' },
-  { id: '#PS-10236', customer: 'Mike Chen', product: 'PS5 Digital Edition', status: 'processing', amount: '$449.99', date: 'Jan 3, 2026' },
-  { id: '#PS-10237', customer: 'Emma Davis', product: 'PlayStation Plus 12-Month', status: 'completed', amount: '$59.99', date: 'Jan 3, 2026' },
-  { id: '#PS-10238', customer: 'James Wilson', product: 'PS VR2 Horizon Bundle', status: 'completed', amount: '$599.99', date: 'Jan 2, 2026' },
+  { id: '#PS-10234', customer: 'Alex Johnson', product: 'PS5 Console + 2 Games', status: 'completed', amount: 599.99, date: 'Jan 4, 2026' },
+  { id: '#PS-10235', customer: 'Sarah Williams', product: 'DualSense Midnight Black', status: 'pending', amount: 74.99, date: 'Jan 4, 2026' },
+  { id: '#PS-10236', customer: 'Mike Chen', product: 'PS5 Digital Edition', status: 'processing', amount: 449.99, date: 'Jan 3, 2026' },
+  { id: '#PS-10237', customer: 'Emma Davis', product: 'PlayStation Plus 12-Month', status: 'completed', amount: 59.99, date: 'Jan 3, 2026' },
+  { id: '#PS-10238', customer: 'James Wilson', product: 'PS VR2 Horizon Bundle', status: 'completed', amount: 599.99, date: 'Jan 2, 2026' },
 ];
 
 const trafficData = [
@@ -56,7 +56,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
           title="Total Revenue"
-          value="$847,239"
+          value={formatPrice(847239)}
           change={12.5}
           trend="up"
           icon={DollarSign}
@@ -107,7 +107,7 @@ export function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Total Earning: $27,208</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Total Earning: {formatPrice(27208)}</span>
                 </div>
               </div>
             </div>
@@ -195,7 +195,7 @@ export function Dashboard() {
                   <p className="text-sm text-gray-500 dark:text-gray-400">{product.sales} sales</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-gray-900 dark:text-white">{product.revenue}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{formatPrice(product.revenue)}</p>
                 </div>
               </div>
             ))}
@@ -230,7 +230,7 @@ export function Dashboard() {
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{order.date}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-gray-900 dark:text-white">{order.amount}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{formatPrice(order.amount)}</p>
                 </div>
               </div>
             ))}

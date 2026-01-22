@@ -9,9 +9,11 @@ interface Product {
   id: string | number;
   name: string;
   category: string;
+  subCategory?: string;
   price: string;
   stock: number;
   image: string;
+  attributes?: Record<string, any>;
   purchasedEmail?: string;
   purchasedPassword?: string;
   productCode?: string;
@@ -29,6 +31,7 @@ interface CustomerInfo {
 }
 
 export function POS() {
+  const { settings, formatPrice } = useStoreSettings();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,6 +135,7 @@ export function POS() {
           quantity: item.quantity,
           price: parseFloat(item.price),
           total: parseFloat(item.price) * item.quantity,
+          attributes: item.attributes || {},
           // Include product credentials if available
           purchasedEmail: item.purchasedEmail || null,
           purchasedPassword: item.purchasedPassword || null,
@@ -432,7 +436,16 @@ export function POS() {
                 <tbody>
                   {lastInvoice.items.map((item: any, index: number) => (
                     <tr key={index} className="border-b border-gray-200 dark:border-gray-700">
-                      <td className="py-3 text-gray-600 dark:text-gray-400">{item.productName}</td>
+                      <td className="py-3 text-gray-600 dark:text-gray-400">
+                        <div>{item.productName}</div>
+                        {item.attributes && Object.entries(item.attributes).length > 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {Object.entries(item.attributes).map(([key, val]) => (
+                              <span key={key} className="mr-2">{key}: {String(val)}</span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-3 text-center text-gray-600 dark:text-gray-400">{item.quantity}</td>
                       <td className="py-3 text-right text-gray-600 dark:text-gray-400">
                         {formatPrice(item.price)}

@@ -15,9 +15,10 @@ interface CartProps {
   isOpen: boolean;
   onClose: () => void;
   onCheckout: () => void;
+  onNavigate: (page: any) => void;
 }
 
-export function Cart({ isOpen, onClose, onCheckout }: CartProps) {
+export function Cart({ isOpen, onClose, onCheckout, onNavigate }: CartProps) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   useEffect(() => {
@@ -103,7 +104,10 @@ export function Cart({ isOpen, onClose, onCheckout }: CartProps) {
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Your cart is empty</h3>
                   <p className="text-gray-600 mb-6">Add some products to get started!</p>
                   <button
-                    onClick={onClose}
+                    onClick={() => {
+                      onClose();
+                      onNavigate('shop');
+                    }}
                     className="px-6 py-3 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg font-medium shadow-lg shadow-red-500/30 hover:shadow-xl transition-all"
                   >
                     Continue Shopping
@@ -210,7 +214,10 @@ export function Cart({ isOpen, onClose, onCheckout }: CartProps) {
                 </button>
 
                 <button
-                  onClick={onClose}
+                  onClick={() => {
+                    onClose();
+                    onNavigate('shop');
+                  }}
                   className="w-full mt-3 py-3 text-gray-600 hover:text-gray-900 font-medium"
                 >
                   Continue Shopping

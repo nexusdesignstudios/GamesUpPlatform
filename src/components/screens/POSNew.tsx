@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ShoppingCart, Trash2, Plus, Minus, User, Mail, Phone, MapPin, CreditCard, X, Package, Grid, List } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, User, Mail, Phone, MapPin, CreditCard, X, Package, Grid, List, Printer, Download } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { publicAnonKey } from '../../utils/supabase/info';
 import { BASE_URL } from '../../utils/api';
+import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 interface Product {
   id: string;
@@ -12,6 +15,7 @@ interface Product {
   image: string;
   categorySlug?: string;
   stock: number;
+  attributes?: Record<string, any>;
 }
 
 interface Category {
@@ -24,6 +28,7 @@ interface Category {
 
 interface CartItem extends Product {
   quantity: number;
+  selectedAttributes?: Record<string, string>;
 }
 
 interface CustomerInfo {
@@ -34,6 +39,7 @@ interface CustomerInfo {
 }
 
 export function POSNew() {
+  const { settings, formatPrice } = useStoreSettings();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -52,6 +58,8 @@ export function POSNew() {
   });
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [loading, setLoading] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [lastInvoice, setLastInvoice] = useState<any>(null);
 
   useEffect(() => {
     loadCategories();
@@ -146,6 +154,38 @@ export function POSNew() {
     setShowCustomerForm(true);
   };
 
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('invoice-content');
+    if (!element) return;
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        logging: false,
+        useCORS: true
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`invoice-${lastInvoice?.invoiceNumber || Date.now()}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF');
+    }
+  };
+
+  const handlePrintInvoice = () => {
+    window.print();
+  };
+
   const handleCompleteCheckout = async () => {
     if (!customerInfo.name || !customerInfo.email || !customerInfo.phone) {
       alert('Please fill in all required customer information');
@@ -154,12 +194,17 @@ export function POSNew() {
 
     setLoading(true);
     try {
+      // Calculate totals for invoice
+      const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const tax = subtotal * (settings.tax_rate / 100);
+      const total = subtotal + tax;
+
       // Create order
       const orderData = {
         customerEmail: customerInfo.email,
         customerName: customerInfo.name,
         items: cart,
-        total: cartTotal,
+        total: total,
         deliveryMethod: 'In-Store Pickup',
         shippingAddress: customerInfo,
       };
@@ -177,13 +222,28 @@ export function POSNew() {
       );
 
       if (response.ok) {
-        alert('Order completed successfully!');
+        // Prepare invoice data
+        const invoice = {
+           invoiceNumber: `INV-${Date.now()}`,
+           date: new Date().toISOString(),
+           customer: customerInfo,
+           items: [...cart], // Copy cart items
+           subtotal,
+           tax,
+           total
+        };
+        setLastInvoice(invoice);
+        setShowInvoice(true);
+        
         setCart([]);
         setCustomerInfo({
           name: '',
           email: '',
           phone: '',
           address: '',
+          city: '',
+          state: '',
+          zipCode: '',
         });
         setShowCustomerForm(false);
       }
@@ -196,7 +256,7 @@ export function POSNew() {
   };
 
   const cartSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const cartTax = cartSubtotal * 0.1;
+  const cartTax = cartSubtotal * (settings.tax_rate / 100);
   const cartTotal = cartSubtotal + cartTax;
 
   return (
@@ -299,7 +359,7 @@ export function POSNew() {
                     <h3 className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-1">
                       {product.name}
                     </h3>
-                    <p className="text-lg font-bold text-red-600 mt-1">${product.price.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-red-600 mt-1">{formatPrice(product.price)}</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Stock: {product.stock}</p>
                   </div>
                 </motion.div>
@@ -328,7 +388,7 @@ export function POSNew() {
                     <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">{product.description}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-bold text-red-600">${product.price.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-red-600">{formatPrice(product.price)}</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Stock: {product.stock}</p>
                   </div>
                 </motion.div>
@@ -380,7 +440,7 @@ export function POSNew() {
                     <h4 className="font-semibold text-sm text-gray-900 dark:text-white truncate">
                       {item.name}
                     </h4>
-                    <p className="text-sm font-bold text-red-600">${item.price.toFixed(2)}</p>
+                    <p className="text-sm font-bold text-red-600">{formatPrice(item.price)}</p>
                   </div>
                   <button
                     onClick={() => removeFromCart(item.id)}
@@ -404,7 +464,7 @@ export function POSNew() {
                     <Plus className="w-4 h-4" />
                   </button>
                   <span className="ml-auto font-bold text-gray-900 dark:text-white">
-                    ${(item.price * item.quantity).toFixed(2)}
+                    {formatPrice(item.price * item.quantity)}
                   </span>
                 </div>
               </div>
@@ -418,15 +478,15 @@ export function POSNew() {
             <div className="space-y-2">
               <div className="flex justify-between text-gray-600 dark:text-gray-400">
                 <span>Subtotal</span>
-                <span className="font-semibold">${cartSubtotal.toFixed(2)}</span>
+                <span className="font-semibold">{formatPrice(cartSubtotal)}</span>
               </div>
               <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                <span>Tax (10%)</span>
-                <span className="font-semibold">${cartTax.toFixed(2)}</span>
+                <span>Tax ({settings.tax_rate}%)</span>
+                <span className="font-semibold">{formatPrice(cartTax)}</span>
               </div>
               <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span>Total</span>
-                <span className="text-red-600">${cartTotal.toFixed(2)}</span>
+                <span className="text-red-600">{formatPrice(cartTotal)}</span>
               </div>
             </div>
 
@@ -492,7 +552,7 @@ export function POSNew() {
                       {selectedProduct.description}
                     </p>
                     <p className="text-3xl font-bold text-red-600 mb-4">
-                      ${selectedProduct.price.toFixed(2)}
+                      {formatPrice(selectedProduct.price)}
                     </p>
                     <div className="space-y-2 mb-6">
                       <div className="flex justify-between text-sm">
@@ -505,6 +565,12 @@ export function POSNew() {
                           {selectedProduct.stock} units
                         </span>
                       </div>
+                      {selectedProduct.attributes && Object.entries(selectedProduct.attributes).map(([key, value]) => (
+                        <div key={key} className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">{key}</span>
+                          <span className="font-semibold">{String(value)}</span>
+                        </div>
+                      ))}
                     </div>
 
                     <button
@@ -522,6 +588,194 @@ export function POSNew() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Invoice Modal */}
+      <AnimatePresence>
+        {showInvoice && lastInvoice && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8 print:hidden">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Invoice Generated</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDownloadPDF}
+                      className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors"
+                      title="Download PDF"
+                    >
+                      <Download className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={handlePrintInvoice}
+                      className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                      title="Print Invoice"
+                    >
+                      <Printer className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setShowInvoice(false)}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-6" id="invoice-content">
+                  <div className="flex justify-between items-start border-b border-gray-200 dark:border-gray-700 pb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">GamesUp Store</h3>
+                      <p className="text-gray-500 dark:text-gray-400">123 Gaming Street</p>
+                      <p className="text-gray-500 dark:text-gray-400">Tech City, TC 90210</p>
+                      <p className="text-gray-500 dark:text-gray-400">contact@gamesup.com</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">Invoice #{lastInvoice.invoiceNumber}</p>
+                      <p className="text-gray-500 dark:text-gray-400">{new Date(lastInvoice.date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-8 border-b border-gray-200 dark:border-gray-700 pb-6">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Bill To:</h4>
+                      <p className="text-gray-600 dark:text-gray-300">{lastInvoice.customer.name}</p>
+                      <p className="text-gray-600 dark:text-gray-300">{lastInvoice.customer.email}</p>
+                      <p className="text-gray-600 dark:text-gray-300">{lastInvoice.customer.phone}</p>
+                    </div>
+                  </div>
+
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <th className="text-left py-2 text-sm font-semibold text-gray-900 dark:text-white">Item</th>
+                        <th className="text-center py-2 text-sm font-semibold text-gray-900 dark:text-white">Qty</th>
+                        <th className="text-right py-2 text-sm font-semibold text-gray-900 dark:text-white">Price</th>
+                        <th className="text-right py-2 text-sm font-semibold text-gray-900 dark:text-white">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {lastInvoice.items.map((item: any, index: number) => (
+                        <tr key={index}>
+                          <td className="py-3 text-sm text-gray-600 dark:text-gray-300">
+                            <div>{item.name}</div>
+                            {item.attributes && Object.entries(item.attributes).length > 0 && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {Object.entries(item.attributes).map(([key, val]) => (
+                                  <span key={key} className="mr-2">{key}: {String(val)}</span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 text-center text-sm text-gray-600 dark:text-gray-300">{item.quantity}</td>
+                          <td className="py-3 text-right text-sm text-gray-600 dark:text-gray-300">{formatPrice(item.price)}</td>
+                          <td className="py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
+                            {formatPrice(item.price * item.quantity)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{formatPrice(lastInvoice.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Tax ({settings.tax_rate}%):</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{formatPrice(lastInvoice.tax)}</span>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold border-t border-gray-200 dark:border-gray-700 pt-2">
+                      <span className="text-gray-900 dark:text-white">Total:</span>
+                      <span className="text-red-600">{formatPrice(lastInvoice.total)}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400 print:hidden">
+                   <p>Thank you for your business!</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Printable Area - Hidden normally, shown on print */}
+      <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[100] p-8">
+        {lastInvoice && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-start border-b border-gray-200 pb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">GamesUp Store</h3>
+                  <p className="text-gray-500">123 Gaming Street</p>
+                  <p className="text-gray-500">Tech City, TC 90210</p>
+                  <p className="text-gray-500">contact@gamesup.com</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-gray-900">Invoice #{lastInvoice.invoiceNumber}</p>
+                  <p className="text-gray-500">{new Date(lastInvoice.date).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 border-b border-gray-200 pb-6">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Bill To:</h4>
+                  <p className="text-gray-600">{lastInvoice.customer.name}</p>
+                  <p className="text-gray-600">{lastInvoice.customer.email}</p>
+                  <p className="text-gray-600">{lastInvoice.customer.phone}</p>
+                </div>
+              </div>
+
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 text-sm font-semibold text-gray-900">Item</th>
+                    <th className="text-center py-2 text-sm font-semibold text-gray-900">Qty</th>
+                    <th className="text-right py-2 text-sm font-semibold text-gray-900">Price</th>
+                    <th className="text-right py-2 text-sm font-semibold text-gray-900">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {lastInvoice.items.map((item: any, index: number) => (
+                    <tr key={index}>
+                      <td className="py-3 text-sm text-gray-600">{item.name}</td>
+                      <td className="py-3 text-center text-sm text-gray-600">{item.quantity}</td>
+                      <td className="py-3 text-right text-sm text-gray-600">{formatPrice(item.price)}</td>
+                      <td className="py-3 text-right text-sm font-medium text-gray-900">
+                        {formatPrice(item.price * item.quantity)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="border-t border-gray-200 pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Subtotal:</span>
+                  <span className="font-medium text-gray-900">{formatPrice(lastInvoice.subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tax ({settings.tax_rate}%):</span>
+                  <span className="font-medium text-gray-900">{formatPrice(lastInvoice.tax)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2">
+                  <span className="text-gray-900">Total:</span>
+                  <span className="text-gray-900">{formatPrice(lastInvoice.total)}</span>
+                </div>
+              </div>
+              
+              <div className="mt-8 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">
+                 <p>Thank you for your business!</p>
+              </div>
+            </div>
+        )}
+      </div>
 
       {/* Customer Information Modal */}
       <AnimatePresence>

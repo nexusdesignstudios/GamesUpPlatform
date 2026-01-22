@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { CreditCard, MapPin, User, Mail, Phone, Lock, CheckCircle, Truck, Package } from 'lucide-react';
+import { CreditCard, MapPin, User, Mail, Phone, Lock, CheckCircle, Truck, Package, Printer } from 'lucide-react';
 import { publicAnonKey } from '../../utils/supabase/info';
 import { BASE_URL } from '../../utils/api';
+import { useStoreSettings } from '../../context/StoreSettingsContext';
 
 interface CheckoutProps {
   onBack: () => void;
@@ -18,11 +20,16 @@ interface DeliveryOption {
 }
 
 export function Checkout({ onBack, onSuccess }: CheckoutProps) {
+  const { formatPrice } = useStoreSettings();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<'info' | 'delivery' | 'payment' | 'success'>('info');
   const [cartItems, setCartItems] = useState<any[]>([]);
+  const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
   const [selectedDelivery, setSelectedDelivery] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod' | 'instapay'>('card');
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -39,9 +46,51 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
   });
 
   useEffect(() => {
-    loadCart();
-    loadDeliveryOptions();
-  }, []);
+    const paymentRef = searchParams.get('payment_ref') || searchParams.get('tran_ref');
+    const orderNumber = searchParams.get('cart_id') || searchParams.get('orderNumber');
+    
+    if (paymentRef && orderNumber) {
+      verifyPayment(paymentRef, orderNumber);
+    } else {
+      loadCart();
+      loadDeliveryOptions();
+    }
+  }, [searchParams]);
+
+  const verifyPayment = async (tranRef: string, orderNumber: string) => {
+    setLoading(true);
+    setStep('payment'); // Show payment step/loading
+    
+    try {
+      const response = await fetch(`${BASE_URL}/payment/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify({ tranRef, orderNumber })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Payment successful
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        setPurchasedItems(cart);
+        setCartItems(cart); // Ensure cartItems is set for success view
+        localStorage.setItem('cart', JSON.stringify([]));
+        setStep('success');
+      } else {
+        alert('Payment verification failed: ' + data.message);
+        setStep('payment');
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      alert('Payment verification failed. Please contact support.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadCart = () => {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -78,6 +127,12 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
     });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setPaymentProofFile(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -86,9 +141,33 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
     } else if (step === 'delivery') {
       setStep('payment');
     } else if (step === 'payment') {
+      if (paymentMethod === 'instapay' && !paymentProofFile) {
+        alert('Please upload a screenshot of your payment.');
+        return;
+      }
+
       setLoading(true);
       
       try {
+        // Upload proof if Instapay
+        let paymentProofUrl = null;
+        if (paymentMethod === 'instapay' && paymentProofFile) {
+          const formData = new FormData();
+          formData.append('image', paymentProofFile);
+          
+          const uploadRes = await fetch(`${BASE_URL}/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            paymentProofUrl = uploadData.url;
+          } else {
+            throw new Error('Failed to upload payment proof');
+          }
+        }
+
         // Get user session
         const savedSession = localStorage.getItem('customerSession');
         let customerEmail = 'guest@gamesup.com';
@@ -119,6 +198,8 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
             state: formData.state,
             zipCode: formData.zipCode,
           },
+          paymentMethod,
+          paymentProof: paymentProofUrl
         };
         
         const response = await fetch(
@@ -134,17 +215,71 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
         );
         
         if (response.ok) {
-          // Clear cart
-          localStorage.setItem('cart', JSON.stringify([]));
-          setStep('success');
+          const data = await response.json();
+          const orderNumber = data.orderNumber;
+
+          if (paymentMethod === 'card') {
+            // Initiate Payment (PayTabs)
+            const payResponse = await fetch(`${BASE_URL}/payment/create`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${publicAnonKey}`,
+              },
+              body: JSON.stringify({
+                orderNumber,
+                customerName,
+                customerEmail,
+                total,
+                shippingAddress: orderData.shippingAddress,
+                items: cartItems
+              })
+            });
+
+            const payData = await payResponse.json();
+
+            if (payData.success && payData.redirect_url) {
+              window.location.href = payData.redirect_url;
+            } else {
+              alert('Failed to initiate payment. Please try again.');
+              setLoading(false);
+            }
+          } else {
+            // COD or Instapay - Direct Success
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            setPurchasedItems(cart);
+            setCartItems(cart);
+            localStorage.setItem('cart', JSON.stringify([]));
+            setStep('success');
+            setLoading(false);
+          }
         } else {
           alert('Failed to create order. Please try again.');
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error creating order:', error);
         alert('Failed to create order. Please try again.');
       } finally {
-        setLoading(false);
+        if (paymentMethod === 'card') {
+            // Loading state is handled by redirect or error
+        } else {
+             // Loading state handled in success block or error
+             // But if error caught, we need to ensure loading is false
+             // If success, we already set loading false.
+             // So safe to set loading false if not redirecting?
+             // Actually, the catch block sets loading false implicitly if we remove the finally block or check method.
+             // But simpler:
+             // If card and success, we redirect, so loading stays true (good).
+             // If error, loading false.
+             // If non-card success, loading false.
+             
+             // The finally block runs always. If we redirect, the page unloads, so finally might not matter or might run before unload.
+             // Best to set loading false only if NOT redirecting.
+             if (paymentMethod !== 'card') {
+                 setLoading(false);
+             }
+        }
       }
     }
   };
@@ -190,6 +325,13 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
                         />
                         <div>
                           <p className="font-bold text-gray-900">{item.name}</p>
+                          {item.attributes && Object.keys(item.attributes).length > 0 && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {Object.entries(item.attributes).map(([key, val]) => (
+                                <span key={key} className="mr-2">{key}: {String(val)}</span>
+                              ))}
+                            </div>
+                          )}
                           <p className="text-sm text-gray-500">Digital Product</p>
                         </div>
                       </div>
@@ -236,14 +378,23 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
 
             <div className="bg-gray-50 rounded-xl p-6 mb-6">
               <p className="text-sm text-gray-600 mb-2">Order Total</p>
-              <p className="text-3xl font-bold text-red-600">${total.toFixed(2)}</p>
+              <p className="text-3xl font-bold text-red-600">{formatPrice(total)}</p>
             </div>
-            <button
-              onClick={onSuccess}
-              className="px-8 py-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-semibold shadow-lg shadow-red-500/30 hover:shadow-xl transition-all"
-            >
-              Continue Shopping
-            </button>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => window.print()}
+                className="px-8 py-4 bg-gray-100 text-gray-900 rounded-xl font-semibold hover:bg-gray-200 transition-all flex items-center gap-2"
+              >
+                <Printer className="w-5 h-5" />
+                Print Receipt
+              </button>
+              <button
+                onClick={onSuccess}
+                className="px-8 py-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-semibold shadow-lg shadow-red-500/30 hover:shadow-xl transition-all"
+              >
+                Continue Shopping
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -471,70 +622,101 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
                     <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
                       <CreditCard className="w-5 h-5 text-red-600" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900">Payment Details</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">Payment Method</h2>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
-                    <input
-                      type="text"
-                      name="cardNumber"
-                      value={formData.cardNumber}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                      placeholder="1234 5678 9012 3456"
-                      maxLength={19}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Cardholder Name</label>
-                    <input
-                      type="text"
-                      name="cardName"
-                      value={formData.cardName}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                      placeholder="John Doe"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+                  <div className="space-y-4">
+                    {/* Credit Card */}
+                    <label className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      paymentMethod === 'card' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}>
                       <input
-                        type="text"
-                        name="expiryDate"
-                        value={formData.expiryDate}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder="MM/YY"
-                        maxLength={5}
-                        required
+                        type="radio"
+                        name="paymentMethod"
+                        value="card"
+                        checked={paymentMethod === 'card'}
+                        onChange={(e) => setPaymentMethod(e.target.value as any)}
+                        className="w-5 h-5 text-red-600 mr-4"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+                      <CreditCard className="w-6 h-6 text-gray-700 mr-3" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Credit Card (PayTabs)</p>
+                        <p className="text-sm text-gray-600">Secure payment via PayTabs gateway</p>
+                      </div>
+                    </label>
+
+                    {/* Cash on Delivery */}
+                    <label className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      paymentMethod === 'cod' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}>
                       <input
-                        type="text"
-                        name="cvv"
-                        value={formData.cvv}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder="123"
-                        maxLength={4}
-                        required
+                        type="radio"
+                        name="paymentMethod"
+                        value="cod"
+                        checked={paymentMethod === 'cod'}
+                        onChange={(e) => setPaymentMethod(e.target.value as any)}
+                        className="w-5 h-5 text-red-600 mr-4"
                       />
-                    </div>
+                      <Truck className="w-6 h-6 text-gray-700 mr-3" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Cash on Delivery</p>
+                        <p className="text-sm text-gray-600">Pay when you receive your order</p>
+                      </div>
+                    </label>
+
+                    {/* Instapay */}
+                    <label className={`flex items-center p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      paymentMethod === 'instapay' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="instapay"
+                        checked={paymentMethod === 'instapay'}
+                        onChange={(e) => setPaymentMethod(e.target.value as any)}
+                        className="w-5 h-5 text-red-600 mr-4"
+                      />
+                      <div className="w-6 h-6 mr-3 flex items-center justify-center text-lg">🏦</div>
+                      <div>
+                        <p className="font-semibold text-gray-900">Instapay Transfer</p>
+                        <p className="text-sm text-gray-600">Transfer and upload screenshot</p>
+                      </div>
+                    </label>
                   </div>
 
-                  <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <Lock className="w-5 h-5 text-blue-600" />
-                    <p className="text-sm text-blue-900">
-                      Your payment information is secure and encrypted
-                    </p>
+                  {/* Payment Details / Instructions */}
+                  <div className="mt-6 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                    {paymentMethod === 'card' && (
+                      <div className="text-center">
+                        <p className="text-gray-700 mb-2">You will be redirected to PayTabs to complete your purchase securely.</p>
+                      </div>
+                    )}
+                    
+                    {paymentMethod === 'cod' && (
+                      <div className="text-center">
+                        <p className="text-gray-700">Please have the exact amount ready upon delivery.</p>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'instapay' && (
+                      <div className="space-y-4">
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <p className="font-bold text-gray-900 mb-2">Instapay Details:</p>
+                          <p className="text-sm text-gray-600">Instapay ID: <span className="font-mono font-bold text-gray-900">username@instapay</span></p>
+                          <p className="text-sm text-gray-600">Phone: <span className="font-mono font-bold text-gray-900">01234567890</span></p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Screenshot</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Please upload a clear screenshot of the transaction receipt.</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -608,6 +790,65 @@ export function Checkout({ onBack, onSuccess }: CheckoutProps) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+      {/* Hidden Print Receipt */}
+      <div className="hidden print:block print:fixed print:inset-0 print:bg-white print:z-[100] p-8">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold mb-2">GamesUp Store</h1>
+          <p className="text-gray-600">Order Receipt</p>
+          <p className="text-sm text-gray-500 mt-2">{new Date().toLocaleString()}</p>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex justify-between mb-2">
+            <span className="font-semibold">Customer:</span>
+            <span>{formData.fullName}</span>
+          </div>
+          <div className="flex justify-between mb-2">
+            <span className="font-semibold">Email:</span>
+            <span>{formData.email}</span>
+          </div>
+        </div>
+
+        <table className="w-full mb-8">
+          <thead>
+            <tr className="border-b-2 border-gray-200">
+              <th className="text-left py-2">Item</th>
+              <th className="text-right py-2">Qty</th>
+              <th className="text-right py-2">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {purchasedItems.map((item, idx) => (
+              <tr key={idx} className="border-b border-gray-100">
+                <td className="py-2">
+                  <div>{item.name}</div>
+                  {item.attributes && Object.keys(item.attributes).length > 0 && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {Object.entries(item.attributes).map(([key, val]) => (
+                        <span key={key} className="mr-2">{key}: {String(val)}</span>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="text-right py-2">1</td>
+                <td className="text-right py-2">{formatPrice(item.price || item.amount || 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="border-t border-gray-200 pt-4 space-y-2">
+          <div className="flex justify-between text-lg font-bold">
+            <span>Total:</span>
+            <span>{formatPrice(total)}</span>
+          </div>
+        </div>
+        
+        <div className="mt-12 text-center text-sm text-gray-500">
+          <p>Thank you for your purchase!</p>
+          <p>www.gamesup.com</p>
         </div>
       </div>
     </div>

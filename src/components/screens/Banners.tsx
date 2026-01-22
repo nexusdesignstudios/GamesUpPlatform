@@ -33,9 +33,26 @@ export function Banners() {
     endDate: '',
   });
 
+  const [specialOffer, setSpecialOffer] = useState({
+    title: 'SPECIAL OFFER',
+    subtitle: 'Up to 50% Off on Selected Items'
+  });
+
   useEffect(() => {
     loadBanners();
+    const savedOffer = localStorage.getItem('specialOfferConfig');
+    if (savedOffer) {
+      setSpecialOffer(JSON.parse(savedOffer));
+    }
   }, []);
+
+  const handleSaveSpecialOffer = () => {
+    localStorage.setItem('specialOfferConfig', JSON.stringify(specialOffer));
+    // Dispatch event for same-tab updates
+    window.dispatchEvent(new Event('specialOfferUpdated'));
+    window.dispatchEvent(new Event('storage')); // Force update for some listeners
+    alert('Special Offer updated successfully!');
+  };
 
   async function loadBanners() {
     try {
@@ -141,6 +158,106 @@ export function Banners() {
           Add Banner
         </Button>
       </div>
+
+      {/* Hero Section Configuration */}
+      <Card className="p-8">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Hero Section</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Badge Text</label>
+            <input
+              type="text"
+              value={heroConfig.badge}
+              onChange={(e) => setHeroConfig({ ...heroConfig, badge: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="🎮 Your Ultimate Gaming Destination"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Main Title</label>
+            <input
+              type="text"
+              value={heroConfig.title}
+              onChange={(e) => setHeroConfig({ ...heroConfig, title: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="GAMES UP"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subtitle</label>
+            <textarea
+              value={heroConfig.subtitle}
+              onChange={(e) => setHeroConfig({ ...heroConfig, subtitle: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Description text..."
+              rows={3}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Primary Button Text</label>
+            <input
+              type="text"
+              value={heroConfig.ctaPrimary}
+              onChange={(e) => setHeroConfig({ ...heroConfig, ctaPrimary: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Shop Now"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Secondary Button Text</label>
+            <input
+              type="text"
+              value={heroConfig.ctaSecondary}
+              onChange={(e) => setHeroConfig({ ...heroConfig, ctaSecondary: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Learn More"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button 
+            onClick={handleSaveHero}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Save Hero Section
+          </Button>
+        </div>
+      </Card>
+
+      {/* Special Offer Configuration */}
+      <Card className="p-8">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Special Offer Section</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Section Title</label>
+            <input
+              type="text"
+              value={specialOffer.title}
+              onChange={(e) => setSpecialOffer({ ...specialOffer, title: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="SPECIAL OFFER"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Offer Text</label>
+            <input
+              type="text"
+              value={specialOffer.subtitle}
+              onChange={(e) => setSpecialOffer({ ...specialOffer, subtitle: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              placeholder="Up to 50% Off on Selected Items"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button 
+            onClick={handleSaveSpecialOffer}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Save Special Offer
+          </Button>
+        </div>
+      </Card>
 
       {/* Banners Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
