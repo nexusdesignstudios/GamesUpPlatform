@@ -23,7 +23,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+
+// Serve uploads with proper MIME types
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 // Configure multer
 const storage = multer.diskStorage({
@@ -1380,7 +1388,26 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
 // In development, dist is one level up from server/
 const distPath = path.join(__dirname, '../dist');
 console.log('Serving static files from:', distPath);
-app.use(express.static(distPath));
+
+// Configure static file serving with proper MIME types
+app.use(express.static(distPath, {
+  setHeaders: (res, filePath) => {
+    // Set correct MIME types for JavaScript modules
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (filePath.endsWith('.mjs')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    } else if (filePath.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    } else if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+    // Enable caching for static assets
+    if (filePath.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+    }
+  }
+}));
 
 // Fallback for client-side routing - serve index.html for all non-API routes
 app.get('*', (req, res) => {
