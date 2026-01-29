@@ -1375,6 +1375,14 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
   }
 });
 
+// Serve static files from Vite's build directory
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Fallback for client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log(`Base URL: http://localhost:${port}${BASE_PATH}`);

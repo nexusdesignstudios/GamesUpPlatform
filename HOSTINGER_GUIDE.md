@@ -1,8 +1,13 @@
-# Hostinger Deployment Guide
+# Hostinger Deployment Guide (Unified Node.js App)
 
-This guide covers how to deploy the **GamesUp Platform** to Hostinger. The project consists of two parts:
-1.  **Frontend**: A React website (built with Vite).
-2.  **Backend**: A Node.js API server (Express) connected to a MySQL database.
+This guide covers how to deploy the **GamesUp Platform** as a single Node.js application on Hostinger. In this setup, the Express backend serves the React frontend, simplifying deployment.
+
+---
+
+## Prerequisites
+
+*   A Hostinger plan that supports **Node.js** (e.g., Business Web Hosting, Cloud Startup, or VPS).
+*   Your project pushed to a GitHub repository (recommended).
 
 ---
 
@@ -21,90 +26,45 @@ This guide covers how to deploy the **GamesUp Platform** to Hostinger. The proje
 
 ---
 
-## Part 2: Backend Deployment (Node.js)
+## Part 2: Application Deployment
 
-Hostinger supports Node.js on VPS plans (recommended) and some Shared Hosting plans.
-
-### Option A: Shared Hosting (hPanel)
-
-1.  In hPanel, go to **Advanced** -> **Node.js**.
-2.  **Create Application**:
-    *   **Node.js Version**: Choose **18** or higher (match your local version if possible).
+1.  In hPanel, navigate to **Websites** -> **Add Website** (or **Manage** existing).
+2.  Select **Node.js Apps**.
+3.  **Application Settings**:
+    *   **Node.js Version**: 18 or higher (match your local version).
     *   **Application Mode**: Production.
-    *   **Application Root**: `server` (or whatever folder you upload to).
-    *   **Application URL**: Choose a subdomain (e.g., `api.yourdomain.com`) or subfolder (e.g., `yourdomain.com/api`). *Subdomain is recommended.*
-    *   **Application Startup File**: `index.js`
-3.  Click **Create**.
-4.  **Upload Files**:
-    *   Use **File Manager** or FTP.
-    *   Navigate to the folder you defined as **Application Root**.
-    *   Upload all files from your local `server` folder **EXCEPT** `node_modules`.
-    *   *Tip: Zip the `server` folder contents, upload the zip, and extract it.*
-5.  **Configure Environment**:
-    *   In the Node.js settings in hPanel, look for "Environment Variables" or create a `.env` file in the Application Root.
-    *   Add the following variables (update with your database details):
-        ```env
-        PORT=3001
-        DB_HOST=localhost
-        DB_USER=u123456789_admin
-        DB_PASSWORD=your_db_password
-        DB_NAME=u123456789_gamesup
-        JWT_SECRET=your_secure_random_secret
-        CORS_ORIGIN=https://yourdomain.com
-        ```
-6.  **Install Dependencies**:
-    *   In the Node.js settings, click the **NPM Install** button. This installs packages from `package.json`.
-7.  **Start the Server**:
-    *   Click **Restart** or **Start**.
-    *   Note your API URL (e.g., `https://api.yourdomain.com`).
+    *   **Application Root**: `/` (Leave as default or root of your domain).
+    *   **Application Startup File**: `server/index.js` (or leave empty if using `npm start` command).
+4.  **Source Code**:
+    *   Click **Import from Git** (Recommended) and connect your repository.
+    *   OR upload project files manually (exclude `node_modules` and `dist`).
+5.  **Build Settings**:
+    *   **Build Command**: `npm install && npm run build`
+        *   *This installs dependencies for both frontend and backend and builds the Vite frontend.*
+    *   **Start Command**: `npm start`
+6.  **Environment Variables**:
+    *   Add the following variables in the Hostinger Dashboard:
+    ```env
+    PORT=3000 (or let Hostinger assign it)
+    DB_HOST=localhost
+    DB_USER=u123456789_admin
+    DB_PASSWORD=your_db_password
+    DB_NAME=u123456789_gamesup
+    JWT_SECRET=your_secure_random_secret
+    CORS_ORIGIN=https://yourdomain.com
+    VITE_API_URL=/functions/v1/make-server-f6f1fb51
+    ```
+    *   **Important**: `VITE_API_URL` should be set to the relative path `/functions/v1/make-server-f6f1fb51` so the frontend correctly communicates with the backend on the same domain.
 
----
-
-## Part 3: Frontend Deployment (React)
-
-1.  **Prepare for Build**:
-    *   Open your local `.env` file (or create `.env.production`).
-    *   Add the `VITE_API_URL` variable pointing to your **Backend URL** from Part 2.
-    *   *Example*:
-        ```env
-        VITE_API_URL=https://api.yourdomain.com/functions/v1/make-server-f6f1fb51
-        ```
-        *(Note: Check your `server/index.js` or `src/utils/supabase/info.tsx` for the exact function name if it differs from `make-server-f6f1fb51`. The default path in `server/index.js` uses `process.env.VITE_SUPABASE_FUNCTION_NAME` or defaults to that string.)*
-
-2.  **Build the Project**:
-    *   Open your terminal in the project root.
-    *   Run:
-        ```bash
-        npm run build
-        ```
-    *   This creates a `dist` (or `build`) folder with your static website files.
-
-3.  **Upload to Hostinger**:
-    *   In hPanel, go to **File Manager**.
-    *   Navigate to `public_html`.
-    *   Delete the default `default.php` if present.
-    *   Upload the **contents** of your local `dist` (or `build`) folder.
-    *   *You should see `index.html`, `assets/`, etc., directly inside `public_html`.*
-
-4.  **Verify**:
-    *   Visit your domain (e.g., `https://yourdomain.com`).
-    *   Test the login or products page to ensure it connects to the backend.
+7.  **Deploy**:
+    *   Click **Deploy / Create**.
+    *   Wait for the build and deployment to finish.
 
 ---
 
 ## Troubleshooting
 
-*   **API Connection Failed**: Check the Network tab in your browser developer tools (F12). If requests are going to `localhost`, you didn't set `VITE_API_URL` correctly before building. If they go to the right URL but fail, check the Backend logs in Hostinger.
-*   **404 on Refresh**: If you visit a page like `/products` and refresh, you might get a 404. You need to configure a `.htaccess` file in `public_html` for React Router.
-
-### Create a `.htaccess` file in `public_html`:
-```apache
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
-</IfModule>
-```
+*   **Build Fails**: Check the build logs. Ensure `npm install` runs successfully.
+*   **Frontend Not Loading**: Ensure `npm run build` created the `dist` folder. The server is configured to serve files from `../dist` relative to `server/index.js`.
+*   **Database Connection Refused**: Ensure you used `localhost` as `DB_HOST` and the correct username/password from Part 1.
+*   **API Errors**: Check the **Application Logs** in Hostinger.

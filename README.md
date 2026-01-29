@@ -8,4 +8,8 @@
   Run `npm i` to install the dependencies.
 
   Run `npm run dev` to start the development server.
+
+  ## Deployment
+
+  See [HOSTINGER_GUIDE.md](./HOSTINGER_GUIDE.md) for instructions on how to deploy this project to Hostinger as a unified Node.js application.
   
