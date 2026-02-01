@@ -13,7 +13,7 @@ const oto = require('./services/oto');
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 
 // Serve static files from Vite's build directory
