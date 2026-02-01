@@ -1442,15 +1442,8 @@ app.get(`${BASE_PATH}/admin/sold-products`, async (req, res) => {
 });
 
 // Fallback for client-side routing - serve index.html for all non-API routes (only if public exists)
-// But exclude static assets to prevent serving index.html for JS/CSS files
 app.get('*', (req, res) => {
   if (fs.existsSync(publicPath)) {
-    // Don't serve index.html for static assets
-    const staticAssetPattern = /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|map|ts|tsx)$/;
-    if (staticAssetPattern.test(req.path)) {
-      return res.status(404).json({ error: 'Static asset not found' });
-    }
-    
     const indexPath = path.join(finalPublicPath, 'index.html');
     console.log('Serving index.html from:', indexPath);
     res.sendFile(indexPath);
