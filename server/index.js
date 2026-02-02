@@ -10,7 +10,23 @@ const paytabs = require('./services/paytabs');
 const oto = require('./services/oto');
 
 // Load environment variables from the root .env file
-dotenv.config({ path: path.join(__dirname, '../.env') });
+const envPath = path.resolve(__dirname, '..', '.env');
+const localEnvPath = path.resolve(__dirname, '..', '.env.local');
+
+console.log('Loading .env from:', envPath);
+const result = dotenv.config({ path: envPath });
+
+// Try to load local development overrides if they exist
+if (fs.existsSync(localEnvPath)) {
+  console.log('🏠 Loading local development overrides from .env.local');
+  dotenv.config({ path: localEnvPath, override: true });
+}
+
+if (result.error) {
+  console.error('Dotenv error:', result.error);
+} else {
+  console.log('✅ .env loaded successfully');
+}
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -104,7 +120,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage })
 
-// Database connection
+// Database connection - support both local and production
+const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_HOST !== 'localhost';
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER,
@@ -120,12 +138,18 @@ const pool = mysql.createPool({
 (async () => {
   try {
     const connection = await pool.getConnection();
-    console.log('Connected to MySQL Database!');
+    console.log('✅ Connected to MySQL Database!');
+    console.log(`📍 Host: ${process.env.DB_HOST || 'localhost'}`);
+    console.log(`👤 User: ${process.env.DB_USER || 'undefined'}`);
+    console.log(`💾 Database: ${process.env.DB_NAME || 'undefined'}`);
     const [rows] = await connection.query('SELECT NOW() as now');
-    console.log('Database Time:', rows[0].now);
+    console.log('⏰ Database Time:', rows[0].now);
     connection.release();
   } catch (err) {
-    console.error('Error connecting to database:', err.message);
+    console.error('❌ Error connecting to database:', err.message);
+    if (process.env.DB_HOST !== 'localhost') {
+      console.log('💡 Note: Production database connection may only work on Hostinger servers');
+    }
   }
 })();
 
