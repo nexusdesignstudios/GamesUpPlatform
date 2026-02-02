@@ -10,18 +10,11 @@ const multer = require('multer');
 const paytabs = require('./services/paytabs');
 const oto = require('./services/oto');
 
-// Load environment variables from the current directory .env file
+// Load environment variables from the .env file
 const envPath = path.resolve(__dirname, '../.env');
-const localEnvPath = path.resolve(__dirname, '../.env.local');
 
 console.log('Loading .env from:', envPath);
 const result = dotenv.config({ path: envPath });
-
-// Try to load local development overrides if they exist
-if (fs.existsSync(localEnvPath)) {
-  console.log('🏠 Loading local development overrides from .env.local');
-  dotenv.config({ path: localEnvPath, override: true });
-}
 
 // If not found, try current directory
 if (result.error && result.error.code === 'ENOENT') {

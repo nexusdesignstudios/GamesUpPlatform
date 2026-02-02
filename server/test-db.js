@@ -3,17 +3,21 @@ const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
 
-// Load environment variables from the root .env file
+// Load environment variables from the .env file
 const envPath = path.resolve(__dirname, '..', '.env');
-const localEnvPath = path.resolve(__dirname, '..', '.env.local');
-
 console.log('Loading .env from:', envPath);
 const result = dotenv.config({ path: envPath });
 
-// Try to load local development overrides if they exist
-if (fs.existsSync(localEnvPath)) {
-  console.log('🏠 Loading local development overrides from .env.local');
-  dotenv.config({ path: localEnvPath, override: true });
+// If not found, try current directory
+if (result.error && result.error.code === 'ENOENT') {
+  console.log('📁 .env not found in parent, trying current directory...');
+  const currentEnvPath = path.resolve(__dirname, '.env');
+  const currentResult = dotenv.config({ path: currentEnvPath });
+  if (!currentResult.error) {
+    console.log('✅ .env loaded from current directory:', currentEnvPath);
+  } else {
+    console.log('❌ .env not found in current directory either');
+  }
 }
 
 if (result.error) {
